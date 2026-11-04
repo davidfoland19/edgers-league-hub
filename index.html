@@ -366,7 +366,7 @@ V.dues=()=>{
   <section><h2>${prev.dueYear} dues</h2>${tbl(prev)}</section>`;
 };
 V.rules=()=>rules();
-const tabs=[['home','This week'],['trades','Trade comp'],['standings','Standings'],['matchups','Matchups'],['rosters','Rosters'],['moves','Moves'],['draft','Draft'],['records','Records'],['dues','Dues'],['rules','Rules']];
+const tabs=[['home','This week'],['trades','Trade comp'],['rules','Rules'],['records','Records'],['matchups','Matchups'],['draft','Draft'],['rosters','Rosters'],['moves','Moves'],['standings','Standings'],['dues','Dues']];
 function render(){
   const h=location.hash.slice(1),cur=V[h]?h:'home';
   document.getElementById('nav').innerHTML=tabs.map(([k,l])=>`<a href="#${k}" ${k==cur?'aria-current="page"':''}>${l}</a>`).join('');
