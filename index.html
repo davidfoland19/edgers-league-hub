@@ -271,7 +271,7 @@ V.records=()=>{
   </div></section>
   <section><h2>Best starts</h2><div class="list">${R.pw.map(x=>{const p=pl(x.id);return row(e(p[0]),`${e(p[1])} · ${tn(x.rid)} · Week ${x.w}`,f2(x.pts))}).join('')}</div></section>`;
 };
-const TRADES_URL=''; // Google Apps Script web app URL
+const TRADES_URL='https://script.google.com/macros/s/AKfycbxv_la5xY_lJaBQdkRkVfJHNtYPRZAkzxQiOJTr9gyuXJL2CXLxup8iKVH43q5g9A7x/exec'; // Google Apps Script web app URL
 const TR={docs:[],owner:false,state:'ok',msg:''};
 let PASS='';try{PASS=localStorage.getItem('edgers-commish')||''}catch(e){}
 TR.owner=!!PASS;
