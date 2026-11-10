@@ -25,6 +25,11 @@ function doPost(e) {
   if (b.pass !== PASSCODE) return out_({ ok: false, error: 'passcode' });
   const row = Number(String(b.id).slice(1));
   if (!(row >= 2 && row <= s.getLastRow())) return out_({ ok: false, error: 'row' });
+  if (b.sides) {
+    s.getRange(row, 6).setValue(JSON.stringify(b.sides).slice(0, 5000));
+    if (b.summary) s.getRange(row, 3).setValue(String(b.summary).slice(0, 500));
+  }
+  if (b.action === 'edit') return out_({ ok: true });
   if (b.action === 'approve') s.getRange(row, 1).setValue('approved');
   else if (b.action === 'reject') s.getRange(row, 1).setValue('rejected');
   else if (b.action === 'delete') s.getRange(row, 1).setValue('deleted');

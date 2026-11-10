@@ -276,7 +276,9 @@ const TR={docs:[],owner:false,state:'ok',msg:''};
 let PASS='';try{PASS=localStorage.getItem('edgers-commish')||''}catch(e){}
 TR.owner=!!PASS;
 async function post(body){const r=await fetch(TRADES_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)});return r.json()}
-async function commish(action,id){try{const j=await post({action,id,pass:PASS});if(!j.ok){if(j.error==='passcode'){PASS='';TR.owner=false;try{localStorage.removeItem('edgers-commish')}catch(e){}setMsg('That passcode is wrong. Sign in again.');render();return}throw 0}await loadTrades()}catch(e){setMsg("That didn't save. Try again in a moment.")}}
+const EDIT={};
+function editSides(id){const d=TR.docs.find(x=>x.id===id);if(!EDIT[id])EDIT[id]=JSON.parse(JSON.stringify(d.sides));return EDIT[id]}
+async function commish(action,id){try{const body={action,id,pass:PASS};if(EDIT[id]&&(action==='approve'||action==='edit')){body.sides=EDIT[id];body.summary=EDIT[id].map(s=>`${T[s.rid].team} sends: ${s.assets.map(a=>`${a.name} (${a.value})`).join(', ')||'nothing'}`).join(' | ')}const j=await post(body);if(!j.ok){if(j.error==='passcode'){PASS='';TR.owner=false;try{localStorage.removeItem('edgers-commish')}catch(e){}setMsg('That passcode is wrong. Sign in again.');render();return}throw 0}delete EDIT[id];if(action==='edit')setMsg('Values saved.');await loadTrades()}catch(e){setMsg("That didn't save. Try again in a moment.")}}
 async function loadTrades(){if(!TRADES_URL)return;try{const r=await fetch(TRADES_URL);const j=await r.json();TR.docs=j.trades||[];renderTradeLists()}catch(e){TR.state='slow';renderTradeLists()}}
 let F={sides:[{rid:'',rows:[{name:'',value:''}]},{rid:'',rows:[{name:'',value:''}]}],tx:null};
 const COMP={floor:2000};
@@ -292,8 +294,9 @@ function flags(d){const out=[];const seen=new Set();approved().filter(x=>x.id!==
   d.sides.forEach(s=>{s.assets.forEach(a=>{if(seen.has(a.name.trim().toLowerCase())&&!isPick(a.name))out.push(`${a.name} already counted this season`)});
     const low=s.assets.filter(a=>!isPick(a.name)&&+a.value<3000&&+a.value>=COMP.floor).length;if(low>3)out.push(`${T[s.rid].team} has ${low} players under 3,000 and only 3 can count`)});return out}
 function fmtTrade(d,cls){return d.sides.map(s=>`<div class="mrow"><b>${tn(s.rid)}</b> sends: ${s.assets.map(a=>`${e(a.name)} <span class="nfl ${+a.value<COMP.floor?'drop':''}">${(+a.value).toLocaleString()}</span>`).join(', ')||'nothing'} <span class="nfl">= ${f2(sidePts(s))} pts</span></div>`).join('')}
+function editTrade(d){const sd=editSides(d.id);return sd.map((s,si)=>`<div class="mrow"><b>${tn(s.rid)}</b> sends <span class="nfl" data-ept="${e(d.id)}-${si}">= ${f2(sidePts(s))} pts</span></div>${s.assets.map((a,ai)=>`<div class="arow"><label for="ev-${e(d.id)}-${si}-${ai}" class="mrow">${e(a.name)}</label><input id="ev-${e(d.id)}-${si}-${ai}" type="number" min="0" max="10000" inputmode="numeric" aria-label="KTC value for ${e(a.name)}" data-ev="${e(d.id)}|${si}|${ai}" value="${e(a.value)}"></div>`).join('')}`).join('')}
 function tradeCard(d){const fl=flags(d);const can=TR.owner&&d.status==='pending',canDel=TR.owner&&d.status==='approved';
-  return `<div class="move"><div class="mhead"><span class="mtype trade">${d.status==='pending'?'Waiting for approval':'Counted'}</span><span>${d.ts?fmtDate(d.ts):''}</span></div>${fmtTrade(d)}${fl.map(x=>`<div class="mrow x">${e(x)}</div>`).join('')}${can?`<div class="chips"><button class="chip" data-appr="${e(d.id)}">Approve</button><button class="chip" data-rej="${e(d.id)}">Reject</button></div>`:''}${canDel?`<div class="chips"><button class="chip" data-rej="${e(d.id)}">Remove from count</button></div>`:''}</div>`}
+  return `<div class="move"><div class="mhead"><span class="mtype trade">${d.status==='pending'?'Waiting for approval':'Counted'}</span><span>${d.ts?fmtDate(d.ts):''}</span></div>${can?editTrade(d):fmtTrade(d)}${fl.map(x=>`<div class="mrow x">${e(x)}</div>`).join('')}${can?`<div class="chips"><button class="chip primary" data-appr="${e(d.id)}">Approve</button><button class="chip" data-edit="${e(d.id)}">Save values</button><button class="chip" data-rej="${e(d.id)}">Reject</button></div>`:''}${canDel?`<div class="chips"><button class="chip" data-rej="${e(d.id)}">Remove from count</button></div>`:''}</div>`}
 const sleeperTrades=()=>D.moves.filter(m=>m.ty==='trade'&&m.ts>=L.draftEnd);
 function unlogged(){const used=new Set(TR.docs.filter(d=>d.status!=='rejected').map(d=>d.tx));return sleeperTrades().filter(m=>!used.has('s'+m.ts))}
 function tradeFromMove(m){const sends=r=>[...m.drop.filter(x=>x[1]==r).map(x=>({name:pl(x[0])[0],value:''})),...m.picks.filter(p=>p[4]==r).map(p=>({name:`${p[0]} Rd ${p[1]}`,value:''}))];
@@ -343,7 +346,7 @@ function formDoc(){return {sides:F.sides.map(s=>({rid:+s.rid,assets:s.rows.filte
 function formError(){const [a,b]=F.sides;if(!a.rid||!b.rid)return 'Pick both teams.';if(a.rid===b.rid)return 'Pick two different teams.';const d=formDoc();if(!d.sides.some(s=>s.assets.length))return 'Add at least one player or pick.';for(const s of F.sides)for(const r of s.rows)if(r.name.trim()&&(r.value===''||+r.value<0||+r.value>10000))return `Enter a KTC value from 0 to 10,000 for ${r.name.trim()}.`;return ''}
 function setMsg(m){TR.msg=m;const x=document.getElementById('tradeMsg');if(x)x.textContent=m}
 const emptyForm=()=>({sides:[{rid:'',rows:[{name:'',value:''}]},{rid:'',rows:[{name:'',value:''}]}],tx:null});
-document.addEventListener('input',ev=>{const t=ev.target;if(t.dataset&&t.dataset.k){F.sides[+t.dataset.s].rows[+t.dataset.j][t.dataset.k]=t.value;const p=document.getElementById('tradePrev');if(p)p.innerHTML=previewHtml()}});
+document.addEventListener('input',ev=>{const t=ev.target;if(t.dataset&&t.dataset.ev){const [id,si,ai]=t.dataset.ev.split('|');const sd=editSides(id);sd[+si].assets[+ai].value=+t.value;const x=document.querySelector(`[data-ept="${id}-${si}"]`);if(x)x.textContent=`= ${f2(sidePts(sd[+si]))} pts`;return}if(t.dataset&&t.dataset.k){F.sides[+t.dataset.s].rows[+t.dataset.j][t.dataset.k]=t.value;const p=document.getElementById('tradePrev');if(p)p.innerHTML=previewHtml()}});
 document.addEventListener('change',ev=>{const t=ev.target;if(t.dataset&&t.dataset.team!==undefined){F.sides[+t.dataset.team].rid=t.value;render()}});
 document.addEventListener('submit',ev=>ev.preventDefault());
 document.addEventListener('change',ev=>{if(ev.target.id==='histSeason'){histSeason=ev.target.value;render()}if(ev.target.id==='histTeam'){histTeam=ev.target.value==='all'?'all':+ev.target.value;render()}});
@@ -354,6 +357,7 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b
   if(k.prefill){const m=D.moves.find(x=>String(x.ts)===k.prefill);F=tradeFromMove(m);TR.msg='Add the KTC values, then submit.';render();scrollTo(0,0)}
   if(k.copy){const er=formError();if(er)return setMsg(er);const d=formDoc();const txt=`TRADE COMP\n`+d.sides.map(s=>`${T[s.rid].team} sends: ${s.assets.map(a=>`${a.name} (${a.value})`).join(', ')||'nothing'} = ${f2(sidePts(s))} pts`).join('\n');const box=document.getElementById('copyBox');box.value=txt;const fb=()=>{box.hidden=false;box.select();setMsg('Copy the text below.')};(navigator.clipboard?navigator.clipboard.writeText(txt).then(()=>setMsg('Copied. Paste it in the league chat.')):Promise.reject()).catch(fb)}
   if(k.appr)commish('approve',k.appr);
+  if(k.edit)commish('edit',k.edit);
   if(k.rej)commish('reject',k.rej);
   if(k.del)commish('delete',k.del);
   if(k.signin){const v=(document.getElementById('passIn')||{}).value||'';if(!v.trim())return;PASS=v.trim();TR.owner=true;try{localStorage.setItem('edgers-commish',PASS)}catch(e){}TR.msg='';render()}
